@@ -1,0 +1,77 @@
+---
+title: "Flu Shot Analysis"
+author: "Andrés Parrado"
+date: "7/19/2020"
+output: pdf_document
+---
+```{r setup}
+library(tidyverse)
+library(skimr)
+
+#Directories
+overall_dir <- "/Users/andresparrado/Desktop/flu_shot/flu_shot"
+input_data_dir <- "/Input Data"
+
+setwd(paste0(overall_dir,input_data_dir))
+```
+
+```{r loading data, warning=FALSE, eval=FALSE}
+setwd(paste0(overall_dir,input_data_dir))
+
+#training_features <- read_csv("training_set_features.csv")
+training_labels   <- read_csv("training_set_labels.csv")
+training_data_onehot <- read_csv("training_data_onehot.csv")
+
+training_dataset <- merge(training_data_onehot, training_labels, by = "respondent_id")
+```
+
+```{r}
+skim(training_dataset)
+```
+```{r lasso_prep, warning=FALSE}
+##Preparing dataset for lasso regression
+library(glmnet)
+
+set.seed(1949)
+
+train <- training_dataset %>%
+  sample_frac(0.8)
+
+test <- training_dataset %>%
+  setdiff(train)
+
+x_train = model.matrix(h1n1_vaccine~., train)[,-1]
+x_test = model.matrix(h1n1_vaccine~., test)[,-1]
+
+
+y_train <- train %>%
+  select(h1n1_vaccine) %>%
+  unlist() %>%
+  as.numeric()
+
+y_test <- test %>%
+  select(h1n1_vaccine) %>%
+  unlist() %>%
+  as.numeric()
+
+cv.lasso <- cv.glmnet(x_train, y_train, alpha = 1, family = "binomial")
+# Fit the final model on the training data
+model <- glmnet(x_train, y_train, alpha = 1, family = "binomial",
+                lambda = cv.lasso$lambda.min)
+```
+
+```{r}
+# Display regression coefficients
+coef(model)
+coef_values <- model %>% 
+  coef() %>% 
+  as.matrix %>% 
+  as.data.frame() %>%
+  rownames_to_column() %>% 
+  arrange(s0)
+```
+
+
+```{r}
+training_dataset %>% group_by(h1n1_vaccine) %>% skim()
+```
